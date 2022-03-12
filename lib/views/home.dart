@@ -25,6 +25,8 @@ class HomeScreen extends StatelessWidget {
                   if (value == null || value.isEmpty) {
                     return 'Room Id cannot be empty!!';
                   }
+
+                  return null;
                 },
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(

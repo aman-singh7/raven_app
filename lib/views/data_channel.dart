@@ -1,8 +1,10 @@
 import 'dart:core';
 import 'dart:typed_data';
 
+import 'package:cheap_share/enums/view_state.dart';
 import 'package:cheap_share/viewmodel/data_channel_viewmodel.dart';
 import 'package:cheap_share/views/base_view.dart';
+import 'package:cheap_share/views/home.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
@@ -154,16 +156,30 @@ class _DataChannelState extends State<DataChannel> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseView<DataChannelViewModel>(
-      onModelReady: (model) {
-        model.onModelReady(widget.roomId);
-      },
-      builder: (context, model, child) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('Data Channel Test'),
-          ),
-          body: OrientationBuilder(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Data Channel Test'),
+      ),
+      body: BaseView<DataChannelViewModel>(
+        onModelReady: (model) {
+          model.onModelReady(widget.roomId);
+        },
+        builder: (context, model, child) {
+          if (model.state == ViewState.BUSY) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (model.isRoomFull) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(),
+              ),
+            );
+          }
+
+          return OrientationBuilder(
             builder: (context, orientation) {
               return Center(
                 child: Container(
@@ -171,14 +187,9 @@ class _DataChannelState extends State<DataChannel> {
                 ),
               );
             },
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: _inCalling ? _hangUp : _makeCall,
-            tooltip: _inCalling ? 'Hangup' : 'Call',
-            child: Icon(_inCalling ? Icons.call_end : Icons.phone),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
