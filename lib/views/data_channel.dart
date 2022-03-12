@@ -1,13 +1,18 @@
 import 'dart:core';
 import 'dart:typed_data';
 
+import 'package:cheap_share/viewmodel/data_channel_viewmodel.dart';
+import 'package:cheap_share/views/base_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class DataChannel extends StatefulWidget {
   static String tag = 'data_channel_sample';
-
-  const DataChannel({Key? key}) : super(key: key);
+  final String roomId;
+  const DataChannel({
+    required this.roomId,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _DataChannelState createState() => _DataChannelState();
@@ -21,11 +26,6 @@ class _DataChannelState extends State<DataChannel> {
   RTCDataChannel? _dataChannel;
 
   String _sdp = '';
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   void _onSignalingState(RTCSignalingState state) {
     print(state);
@@ -78,8 +78,7 @@ class _DataChannelState extends State<DataChannel> {
   void _makeCall() async {
     var configuration = <String, dynamic>{
       'iceServers': [
-        // {'url': 'stun:stun.l.google.com:19302'},
-        {'url': 'http://localhost:8000/'},
+        {'url': 'stun:stun.l.google.com:19302'},
       ]
     };
 
@@ -155,24 +154,31 @@ class _DataChannelState extends State<DataChannel> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Data Channel Test'),
-      ),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return Center(
-            child: Container(
-              child: _inCalling ? Text(_sdp) : Text('data channel test'),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _inCalling ? _hangUp : _makeCall,
-        tooltip: _inCalling ? 'Hangup' : 'Call',
-        child: Icon(_inCalling ? Icons.call_end : Icons.phone),
-      ),
+    return BaseView<DataChannelViewModel>(
+      onModelReady: (model) {
+        model.onModelReady(widget.roomId);
+      },
+      builder: (context, model, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Data Channel Test'),
+          ),
+          body: OrientationBuilder(
+            builder: (context, orientation) {
+              return Center(
+                child: Container(
+                  child: _inCalling ? Text(_sdp) : Text('data channel test'),
+                ),
+              );
+            },
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _inCalling ? _hangUp : _makeCall,
+            tooltip: _inCalling ? 'Hangup' : 'Call',
+            child: Icon(_inCalling ? Icons.call_end : Icons.phone),
+          ),
+        );
+      },
     );
   }
 }

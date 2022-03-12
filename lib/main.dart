@@ -1,17 +1,19 @@
-import 'package:cheap_share/views/join_room.dart';
+import 'package:cheap_share/locator.dart';
+import 'package:cheap_share/views/home.dart';
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-void main() {
+void main() async {
   if (WebRTC.platformIsDesktop) {
     debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
   } else if (WebRTC.platformIsAndroid) {
-    WidgetsFlutterBinding.ensureInitialized();
-    startForegroundService();
+    // WidgetsFlutterBinding.ensureInitialized();
+    // startForegroundService();
   }
+  await setUpLocator();
   runApp(const MyApp());
 }
 
@@ -35,10 +37,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Cheap Share',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const JoinRoom(),
+      home: HomeScreen(),
     );
   }
 }
