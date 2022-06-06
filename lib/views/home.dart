@@ -1,3 +1,4 @@
+import 'package:cheap_share/views/data_channel.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -46,7 +47,13 @@ class HomeScreen extends StatelessWidget {
                 color: Colors.blue,
                 onPressed: () {
                   if (_formKey.currentState?.validate() ?? false) {
-                    // Navigate to Room
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DataChannel(
+                          roomId: _roomIdController.text,
+                        ),
+                      ),
+                    );
                   }
                 },
                 child: const Text(
