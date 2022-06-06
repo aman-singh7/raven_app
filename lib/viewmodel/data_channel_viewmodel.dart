@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cheap_share/config/config.dart';
 import 'package:cheap_share/enums/view_state.dart';
 import 'package:cheap_share/viewmodel/base_viewmodel.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -9,10 +13,12 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 class DataChannelViewModel extends BaseViewModel {
   late io.Socket _socket;
   RTCPeerConnection? _peerConnection;
-  bool isRoomFull = false;
   String? _otherUserId;
   RTCDataChannelInit? _dataChannelDict;
   RTCDataChannel? _dataChannel;
+  PlatformFile? _file;
+  File? tempFile;
+  List<int> _receivedData = [];
 
   String _sdp = '';
 
@@ -20,6 +26,15 @@ class DataChannelViewModel extends BaseViewModel {
 
   set otherUserId(String? id) {
     _otherUserId = id;
+    notifyListeners();
+  }
+
+  String? _fileName;
+
+  String? get fileName => _fileName;
+
+  set fileName(String? name) {
+    _fileName = name;
     notifyListeners();
   }
 
@@ -63,18 +78,13 @@ class DataChannelViewModel extends BaseViewModel {
     final payload = {
       'target': _otherUserId,
       'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex,
     };
     _socket.emit('ice-candidate', payload);
     _sdp += '\n';
     _sdp += candidate.candidate ?? '';
-  }
-
-  void _onIceGatheringState(RTCIceGatheringState state) {
-    print('Gathering state: ${state.toString()}');
-  }
-
-  void _onIceConnectionState(RTCIceConnectionState state) {
-    print('Gathering state: ${state.toString()}');
+    debugPrint(_sdp);
   }
 
   void _onRenegotiationNeeded(String socketId) async {
@@ -93,59 +103,21 @@ class DataChannelViewModel extends BaseViewModel {
     }
   }
 
-  void _handleNewICECandidate(Map<String, dynamic> incoming) {
+  void _handleNewICECandidate(Map<String, dynamic> iceCandidate) {
     _peerConnection!
-        .addCandidate(RTCIceCandidate(incoming['candidate'], null, null))
-        .catchError((err) {
-      print('Error while add new ice candidate: $err');
-    });
+        .addCandidate(
+      RTCIceCandidate(
+        iceCandidate['candidate'],
+        iceCandidate['sdpMid'],
+        iceCandidate['sdpMLineIndex'],
+      ),
+    )
+        .catchError(
+      (err) {
+        debugPrint('Error while add new ice candidate: $err');
+      },
+    );
   }
-
-  void _onSignalingState(RTCSignalingState state) {
-    debugPrint('signaling state index: ${state.index}, name: ${state.name}');
-  }
-
-  // void createConnection(List<String> socketIds) async {
-  //   if (socketIds.isEmpty) return;
-
-  //   try {
-  //     _peerConnection = await createPeerConnection(
-  //       configuration,
-  //       loopbackConstraints,
-  //     );
-  //     _peerConnection!.onSignalingState = _onSignalingState;
-  //     _peerConnection!.onIceCandidate = _onICECandidate;
-  //     _peerConnection!.onIceGatheringState = _onIceGatheringState;
-  //     _peerConnection!.onIceConnectionState = _onIceConnectionState;
-  //     _peerConnection!.onRenegotiationNeeded =
-  //         () => _onRenegotiationNeeded(socketIds[0]);
-
-  //     _dataChannelDict = RTCDataChannelInit();
-  //     _dataChannelDict!.id = 1;
-  //     _dataChannelDict!.ordered = true;
-  //     _dataChannelDict!.maxRetransmitTime = -1;
-  //     _dataChannelDict!.maxRetransmits = -1;
-  //     _dataChannelDict!.protocol = 'sctp';
-  //     _dataChannelDict!.negotiated = false;
-
-  //     _dataChannel = await _peerConnection!
-  //         .createDataChannel('dataChannel', _dataChannelDict!);
-  //     _peerConnection!.onDataChannel = _onDataChannel;
-
-  //     var description = await _peerConnection!.createOffer(offerSdpConstraints);
-  //     print(description.sdp);
-  //     await _peerConnection!.setLocalDescription(description);
-
-  //     _sdp = description.sdp ?? '';
-  //     //change for loopback.
-  //     //description.type = 'answer';
-  //     //_peerConnection.setRemoteDescription(description);
-  //   } catch (err) {
-  //     debugPrint(err.toString());
-  //   }
-
-  //   otherUserId = socketIds[0];
-  // }
 
   void callUser() async {
     _peerConnection = await createPeer();
@@ -157,18 +129,19 @@ class DataChannelViewModel extends BaseViewModel {
     _dataChannelDict!.maxRetransmits = -1;
     _dataChannelDict!.protocol = 'sctp';
     _dataChannelDict!.negotiated = false;
-    await _peerConnection!.createDataChannel('dataChannel', _dataChannelDict!);
+    _dataChannel = await _peerConnection!
+        .createDataChannel('dataChannel', _dataChannelDict!);
 
     _peerConnection!.onDataChannel = _onDataChannel;
   }
 
   Future<RTCPeerConnection> createPeer() async {
-    final _peer = await createPeerConnection(_configuration);
-    _peerConnection!.onIceCandidate = _onICECandidate;
-    _peerConnection!.onRenegotiationNeeded =
+    final peer = await createPeerConnection(_configuration);
+    peer.onIceCandidate = _onICECandidate;
+    peer.onRenegotiationNeeded =
         () => _onRenegotiationNeeded(_otherUserId ?? '');
 
-    return _peer;
+    return peer;
   }
 
   void _handleOffer(data) async {
@@ -194,7 +167,8 @@ class DataChannelViewModel extends BaseViewModel {
   }
 
   void _handleAnswer(data) async {
-    final desc = RTCSessionDescription(data['spd'], data['type']);
+    debugPrint('Sdp: ${data['sdp']} type: ${data['type']}');
+    final desc = RTCSessionDescription(data['sdp'], data['type']);
     try {
       await _peerConnection!.setRemoteDescription(desc);
     } catch (err) {
@@ -204,29 +178,88 @@ class DataChannelViewModel extends BaseViewModel {
 
   /// Send some sample messages and handle incoming messages.
   void _onDataChannel(RTCDataChannel dataChannel) {
-    dataChannel.onMessage = (message) {
+    dataChannel.messageStream.listen((message) async {
       if (message.type == MessageType.text) {
-        print(message.text);
+        var response = {};
+        try {
+          response = json.decode(message.text);
+        } catch (err) {
+          debugPrint('Error occured while parsing, ${err.toString()}');
+          return;
+        }
+        if (response['done']) {
+          try {
+            final path = await FilePicker.platform.getDirectoryPath();
+            debugPrint('Path: $path');
+            final tempName = response['fileName'];
+            tempFile =
+                await File('$path/$tempName').writeAsBytes(_receivedData);
+          } catch (err) {
+            debugPrint('Error occured while parsing file. ${err.toString()}');
+          }
+          _receivedData = [];
+          debugPrint('File received');
+        } else {
+          _receivedData = [];
+        }
       } else {
-        // do something with message.binary
-      }
-    };
-    // or alternatively:
-    dataChannel.messageStream.listen((message) {
-      if (message.type == MessageType.text) {
-        print(message.text);
-      } else {
-        // do something with message.binary
+        _receivedData.addAll(message.binary.toList());
       }
     });
+  }
 
-    dataChannel.send(RTCDataChannelMessage('Hello!'));
-    dataChannel.send(RTCDataChannelMessage.fromBinary(Uint8List(5)));
+  void resetState() async {
+    await FilePicker.platform.clearTemporaryFiles();
+    fileName = '';
+  }
+
+  void pickFile() async {
+    final file = await FilePicker.platform.pickFiles(
+      withReadStream: true,
+    );
+    _file = file?.files.first;
+    fileName = _file?.name;
+  }
+
+  void sendFile() {
+    final fileStream = _file?.readStream;
+    if (fileStream == null) return;
+
+    fileStream.listen(
+      (data) {
+        _dataChannel?.send(
+          RTCDataChannelMessage.fromBinary(
+            Uint8List.fromList(data),
+          ),
+        );
+      },
+      onDone: () {
+        final res = {
+          'done': true,
+          'fileName': _file?.name,
+        };
+        _dataChannel?.send(
+          RTCDataChannelMessage(
+            json.encode(res),
+          ),
+        );
+      },
+      onError: (error, stackTrace) {
+        debugPrint('Error: $error');
+        _dataChannel?.send(
+          RTCDataChannelMessage(
+            json.encode(
+              {'done': false},
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void onModelReady(String roomId) {
     setState(ViewState.BUSY);
-    _socket = io.io('http://192.168.43.235:8000/', <String, dynamic>{
+    _socket = io.io(Environment.wsUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
@@ -234,7 +267,7 @@ class DataChannelViewModel extends BaseViewModel {
     _socket.connect();
     _socket.emit('join room', roomId);
     _socket.on('other user', (data) {
-      otherUserId = data[0];
+      otherUserId = data;
       callUser();
     });
     _socket.on('user joined', (userId) {
@@ -247,9 +280,6 @@ class DataChannelViewModel extends BaseViewModel {
       (data) => _handleNewICECandidate(data),
     );
     _socket.on('data', (data) {});
-    _socket.on('room full', (data) {
-      isRoomFull = true;
-    });
     setState(ViewState.IDLE);
   }
 
