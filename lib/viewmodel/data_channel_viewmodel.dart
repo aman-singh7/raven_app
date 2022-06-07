@@ -85,7 +85,7 @@ class DataChannelViewModel extends BaseViewModel {
   void _onRenegotiationNeeded(String socketId) async {
     debugPrint('Renegotitation Needed');
     try {
-      final offer = await _peerConnection!.createOffer();
+      final offer = await _peerConnection!.createOffer(offerSdpConstraints);
       await _peerConnection!.setLocalDescription(offer);
       final payload = {
         'target': socketId,
@@ -137,7 +137,10 @@ class DataChannelViewModel extends BaseViewModel {
   }
 
   Future<RTCPeerConnection> createPeer() async {
-    final peer = await createPeerConnection(_configuration);
+    final peer = await createPeerConnection(
+      _configuration,
+      loopbackConstraints,
+    );
     peer.onIceCandidate = _onICECandidate;
     peer.onSignalingState = _onSignalingState;
     peer.onRenegotiationNeeded =
@@ -158,7 +161,7 @@ class DataChannelViewModel extends BaseViewModel {
     try {
       final desc = RTCSessionDescription(data['sdp'], data['type']);
       await _peerConnection!.setRemoteDescription(desc);
-      final answer = await _peerConnection!.createAnswer();
+      final answer = await _peerConnection!.createAnswer(offerSdpConstraints);
       await _peerConnection!.setLocalDescription(answer);
       final payload = {
         'target': _otherUserId,
@@ -188,6 +191,7 @@ class DataChannelViewModel extends BaseViewModel {
   void _onDataChannel(RTCDataChannel dataChannel) {
     dataChannel.messageStream.listen((message) async {
       if (message.type == MessageType.text) {
+        debugPrint(message.text);
         var response = {};
         try {
           response = json.decode(message.text);
