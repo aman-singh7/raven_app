@@ -1,3 +1,5 @@
+import 'package:cheap_share/utils/random_string_util.dart';
+import 'package:cheap_share/views/data_channel.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -46,7 +48,15 @@ class HomeScreen extends StatelessWidget {
                 color: Colors.blue,
                 onPressed: () {
                   if (_formKey.currentState?.validate() ?? false) {
-                    // Navigate to Room
+                    final roomId = _roomIdController.text;
+                    _roomIdController.text = '';
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DataChannel(
+                          roomId: roomId,
+                        ),
+                      ),
+                    );
                   }
                 },
                 child: const Text(
@@ -61,7 +71,17 @@ class HomeScreen extends StatelessWidget {
               height: 45,
               minWidth: double.infinity,
               color: Colors.blue,
-              onPressed: () {},
+              onPressed: () {
+                final roomId = RandomStringUtil.getRandomString(6);
+                _roomIdController.text = '';
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DataChannel(
+                      roomId: roomId,
+                    ),
+                  ),
+                );
+              },
               child: const Text(
                 'Create Room',
                 style: TextStyle(
