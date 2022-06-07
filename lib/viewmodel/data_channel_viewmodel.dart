@@ -20,8 +20,6 @@ class DataChannelViewModel extends BaseViewModel {
   File? tempFile;
   List<int> _receivedData = [];
 
-  String _sdp = '';
-
   String? get otherUserId => _otherUserId;
 
   set otherUserId(String? id) {
@@ -82,12 +80,10 @@ class DataChannelViewModel extends BaseViewModel {
       'sdpMLineIndex': candidate.sdpMLineIndex,
     };
     _socket.emit('ice-candidate', payload);
-    _sdp += '\n';
-    _sdp += candidate.candidate ?? '';
-    debugPrint(_sdp);
   }
 
   void _onRenegotiationNeeded(String socketId) async {
+    debugPrint('Renegotitation Needed');
     try {
       final offer = await _peerConnection!.createOffer();
       await _peerConnection!.setLocalDescription(offer);
@@ -103,25 +99,21 @@ class DataChannelViewModel extends BaseViewModel {
     }
   }
 
-  void _handleNewICECandidate(Map<String, dynamic> iceCandidate) {
-    _peerConnection!
-        .addCandidate(
-      RTCIceCandidate(
-        iceCandidate['candidate'],
-        iceCandidate['sdpMid'],
-        iceCandidate['sdpMLineIndex'],
-      ),
-    )
-        .catchError(
-      (err) {
-        debugPrint('Error while add new ice candidate: $err');
-      },
-    );
+  void _handleNewICECandidateData(Map<String, dynamic> iceCandidate) async {
+    try {
+      _peerConnection?.addCandidate(
+        RTCIceCandidate(
+          iceCandidate['candidate'],
+          iceCandidate['sdpMid'],
+          iceCandidate['sdpMLineIndex'],
+        ),
+      );
+    } catch (err) {
+      debugPrint('Error while add new ice candidate: $err');
+    }
   }
 
-  void callUser() async {
-    _peerConnection = await createPeer();
-
+  void dataChannelInit() {
     _dataChannelDict = RTCDataChannelInit();
     _dataChannelDict!.id = 1;
     _dataChannelDict!.ordered = true;
@@ -129,15 +121,25 @@ class DataChannelViewModel extends BaseViewModel {
     _dataChannelDict!.maxRetransmits = -1;
     _dataChannelDict!.protocol = 'sctp';
     _dataChannelDict!.negotiated = false;
+  }
+
+  void callUser() async {
+    _peerConnection = await createPeer();
+    dataChannelInit();
     _dataChannel = await _peerConnection!
         .createDataChannel('dataChannel', _dataChannelDict!);
 
     _peerConnection!.onDataChannel = _onDataChannel;
   }
 
+  void _onSignalingState(RTCSignalingState state) {
+    debugPrint('Current state: ${state.name}');
+  }
+
   Future<RTCPeerConnection> createPeer() async {
     final peer = await createPeerConnection(_configuration);
     peer.onIceCandidate = _onICECandidate;
+    peer.onSignalingState = _onSignalingState;
     peer.onRenegotiationNeeded =
         () => _onRenegotiationNeeded(_otherUserId ?? '');
 
@@ -145,11 +147,16 @@ class DataChannelViewModel extends BaseViewModel {
   }
 
   void _handleOffer(data) async {
-    _peerConnection ??= await createPeer();
+    debugPrint('Handle offer, type: ${data['type']}');
+
+    _peerConnection = await createPeer();
+    dataChannelInit();
+    _dataChannel = await _peerConnection!
+        .createDataChannel('dataChannel', _dataChannelDict!);
     _peerConnection!.onDataChannel = _onDataChannel;
 
     try {
-      final desc = await _peerConnection!.createOffer();
+      final desc = RTCSessionDescription(data['sdp'], data['type']);
       await _peerConnection!.setRemoteDescription(desc);
       final answer = await _peerConnection!.createAnswer();
       await _peerConnection!.setLocalDescription(answer);
@@ -162,12 +169,13 @@ class DataChannelViewModel extends BaseViewModel {
 
       _socket.emit('answer', payload);
     } catch (err) {
-      debugPrint(err.toString());
+      debugPrint('Error occured while handling offer ${err.toString()}');
     }
   }
 
   void _handleAnswer(data) async {
-    debugPrint('Sdp: ${data['sdp']} type: ${data['type']}');
+    debugPrint('Handeling Answer type: ${data['type']}');
+
     final desc = RTCSessionDescription(data['sdp'], data['type']);
     try {
       await _peerConnection!.setRemoteDescription(desc);
@@ -257,6 +265,10 @@ class DataChannelViewModel extends BaseViewModel {
     );
   }
 
+  void sendTestMessage() {
+    _dataChannel?.send(RTCDataChannelMessage('Test Message!'));
+  }
+
   void onModelReady(String roomId) {
     setState(ViewState.BUSY);
     _socket = io.io(Environment.wsUrl, <String, dynamic>{
@@ -277,7 +289,7 @@ class DataChannelViewModel extends BaseViewModel {
     _socket.on('answer', (data) => _handleAnswer(data));
     _socket.on(
       'ice-candidate',
-      (data) => _handleNewICECandidate(data),
+      (data) => _handleNewICECandidateData(data),
     );
     _socket.on('data', (data) {});
     setState(ViewState.IDLE);
