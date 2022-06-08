@@ -21,7 +21,7 @@ class DataChannel extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Data Channel Test'),
+          title: const Text('Data Channel'),
         ),
         body: BaseView<DataChannelViewModel>(
           onModelReady: (model) {

@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cheap_share/config/config.dart';
 import 'package:cheap_share/enums/view_state.dart';
+import 'package:cheap_share/utils/download_web.dart';
 import 'package:cheap_share/viewmodel/base_viewmodel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class DataChannelViewModel extends BaseViewModel {
@@ -200,14 +203,22 @@ class DataChannelViewModel extends BaseViewModel {
           return;
         }
         if (response['done']) {
-          try {
-            final path = await FilePicker.platform.getDirectoryPath();
-            debugPrint('Path: $path');
-            final tempName = response['fileName'];
-            tempFile =
-                await File('$path/$tempName').writeAsBytes(_receivedData);
-          } catch (err) {
-            debugPrint('Error occured while parsing file. ${err.toString()}');
+          debugPrint('Received Data length: ${_receivedData.length}');
+          if (kIsWeb) {
+            await DownloadUtil.webDownload(
+              bytes: _receivedData,
+              name: response['fileName'],
+            );
+          } else {
+            try {
+              final path = await getDownloadsDirectory();
+              debugPrint('Path: $path');
+              final tempName = response['fileName'];
+              tempFile =
+                  await File('$path/$tempName').writeAsBytes(_receivedData);
+            } catch (err) {
+              debugPrint('Error occured while parsing file. ${err.toString()}');
+            }
           }
           _receivedData = [];
           debugPrint('File received');
@@ -235,21 +246,33 @@ class DataChannelViewModel extends BaseViewModel {
 
   void sendFile() {
     final fileStream = _file?.readStream;
+    debugPrint('fileStream: ${fileStream != null}');
     if (fileStream == null) return;
 
     fileStream.listen(
       (data) {
-        _dataChannel?.send(
-          RTCDataChannelMessage.fromBinary(
-            Uint8List.fromList(data),
-          ),
-        );
+        debugPrint('data send: ${data.length}');
+        int initialIdx = 0, finalIdx;
+        while (initialIdx < data.length) {
+          finalIdx = min(initialIdx + 1200, data.length);
+
+          // Converting the data to chunks
+          final chunk = data.getRange(initialIdx, finalIdx).toList();
+          _dataChannel?.send(
+            RTCDataChannelMessage.fromBinary(
+              Uint8List.fromList(chunk),
+            ),
+          );
+
+          initialIdx = finalIdx;
+        }
       },
       onDone: () {
         final res = {
           'done': true,
           'fileName': _file?.name,
         };
+        debugPrint('Sent Successfully');
         _dataChannel?.send(
           RTCDataChannelMessage(
             json.encode(res),
@@ -267,10 +290,6 @@ class DataChannelViewModel extends BaseViewModel {
         );
       },
     );
-  }
-
-  void sendTestMessage() {
-    _dataChannel?.send(RTCDataChannelMessage('Test Message!'));
   }
 
   void onModelReady(String roomId) {
