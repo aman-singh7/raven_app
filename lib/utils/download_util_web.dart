@@ -2,10 +2,10 @@ import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 
 class DownloadUtil {
-  static Future webDownload({
+  static Future download({
     required List<int> bytes,
     String? name,
   }) async {

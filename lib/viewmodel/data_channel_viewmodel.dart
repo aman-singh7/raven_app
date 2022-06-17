@@ -1,17 +1,17 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cheap_share/config/config.dart';
 import 'package:cheap_share/enums/view_state.dart';
-import 'package:cheap_share/utils/download_web.dart';
 import 'package:cheap_share/viewmodel/base_viewmodel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+
+import '../utils/download_util.dart'
+    if (dart.library.js) '../utils/download_util_web.dart';
 
 class DataChannelViewModel extends BaseViewModel {
   late io.Socket _socket;
@@ -20,7 +20,6 @@ class DataChannelViewModel extends BaseViewModel {
   RTCDataChannelInit? _dataChannelDict;
   RTCDataChannel? _dataChannel;
   PlatformFile? _file;
-  File? tempFile;
   List<int> _receivedData = [];
 
   String? get otherUserId => _otherUserId;
@@ -128,6 +127,7 @@ class DataChannelViewModel extends BaseViewModel {
 
   void callUser() async {
     _peerConnection = await createPeer();
+    _onRenegotiationNeeded(otherUserId ?? '');
     dataChannelInit();
     _dataChannel = await _peerConnection!
         .createDataChannel('dataChannel', _dataChannelDict!);
@@ -204,22 +204,10 @@ class DataChannelViewModel extends BaseViewModel {
         }
         if (response['done']) {
           debugPrint('Received Data length: ${_receivedData.length}');
-          if (kIsWeb) {
-            await DownloadUtil.webDownload(
-              bytes: _receivedData,
-              name: response['fileName'],
-            );
-          } else {
-            try {
-              final path = await getDownloadsDirectory();
-              debugPrint('Path: $path');
-              final tempName = response['fileName'];
-              tempFile =
-                  await File('$path/$tempName').writeAsBytes(_receivedData);
-            } catch (err) {
-              debugPrint('Error occured while parsing file. ${err.toString()}');
-            }
-          }
+          await DownloadUtil.download(
+            bytes: _receivedData,
+            name: response['fileName'],
+          );
           _receivedData = [];
           debugPrint('File received');
         } else {
