@@ -81,7 +81,9 @@ class DataChannelViewModel extends BaseViewModel {
       'sdpMid': candidate.sdpMid,
       'sdpMLineIndex': candidate.sdpMLineIndex,
     };
-    _socket.emit('ice-candidate', payload);
+
+    Future.delayed(const Duration(seconds: 1),
+        () => _socket.emit('ice-candidate', payload));
   }
 
   void _onRenegotiationNeeded(String socketId) async {
@@ -127,7 +129,7 @@ class DataChannelViewModel extends BaseViewModel {
 
   void callUser() async {
     _peerConnection = await createPeer();
-    _onRenegotiationNeeded(otherUserId ?? '');
+    // _onRenegotiationNeeded(otherUserId ?? '');
     dataChannelInit();
     _dataChannel = await _peerConnection!
         .createDataChannel('dataChannel', _dataChannelDict!);
