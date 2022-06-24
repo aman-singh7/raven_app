@@ -1,4 +1,5 @@
 import 'package:cheap_share/locator.dart';
+import 'package:cheap_share/utils/request_permission_utils.dart';
 import 'package:cheap_share/views/home.dart';
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;

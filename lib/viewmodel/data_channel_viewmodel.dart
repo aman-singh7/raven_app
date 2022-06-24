@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -8,10 +9,13 @@ import 'package:cheap_share/viewmodel/base_viewmodel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../utils/download_util.dart'
     if (dart.library.js) '../utils/download_util_web.dart';
+import '../utils/request_permission_utils.dart';
 
 class DataChannelViewModel extends BaseViewModel {
   late io.Socket _socket;
@@ -21,6 +25,7 @@ class DataChannelViewModel extends BaseViewModel {
   RTCDataChannel? _dataChannel;
   PlatformFile? _file;
   List<int> _receivedData = [];
+  dynamic _object;
 
   String? get otherUserId => _otherUserId;
 
@@ -317,4 +322,5 @@ class DataChannelViewModel extends BaseViewModel {
     _dataChannel?.close();
     _peerConnection?.close();
   }
+
 }
