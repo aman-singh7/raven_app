@@ -73,7 +73,10 @@ class DataChannelViewModel extends BaseViewModel {
   };
 
   void _onICECandidate(RTCIceCandidate candidate) async {
-    if (candidate.candidate == null) return;
+    if (candidate.candidate == null) {
+      _createOffer();
+      return;
+    }
 
     final payload = {
       'target': _otherUserId,
@@ -86,13 +89,12 @@ class DataChannelViewModel extends BaseViewModel {
         () => _socket.emit('ice-candidate', payload));
   }
 
-  void _onRenegotiationNeeded(String socketId) async {
-    debugPrint('Renegotitation Needed');
+  void _createOffer() async {
     try {
       final offer = await _peerConnection!.createOffer(offerSdpConstraints);
       await _peerConnection!.setLocalDescription(offer);
       final payload = {
-        'target': socketId,
+        'target': _otherUserId,
         'caller': _socket.id,
         'sdp': offer.sdp,
         'type': offer.type,
@@ -101,6 +103,11 @@ class DataChannelViewModel extends BaseViewModel {
     } catch (err) {
       debugPrint("Error handling negotiation needed event ${err.toString()}");
     }
+  }
+
+  void _onRenegotiationNeeded() {
+    debugPrint('Renegotitation Needed');
+    _createOffer();
   }
 
   void _handleNewICECandidateData(Map<String, dynamic> iceCandidate) async {
@@ -129,7 +136,6 @@ class DataChannelViewModel extends BaseViewModel {
 
   void callUser() async {
     _peerConnection = await createPeer();
-    // _onRenegotiationNeeded(otherUserId ?? '');
     dataChannelInit();
     _dataChannel = await _peerConnection!
         .createDataChannel('dataChannel', _dataChannelDict!);
@@ -148,8 +154,7 @@ class DataChannelViewModel extends BaseViewModel {
     );
     peer.onIceCandidate = _onICECandidate;
     peer.onSignalingState = _onSignalingState;
-    peer.onRenegotiationNeeded =
-        () => _onRenegotiationNeeded(_otherUserId ?? '');
+    peer.onRenegotiationNeeded = _onRenegotiationNeeded;
 
     return peer;
   }
