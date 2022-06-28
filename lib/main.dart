@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   if (WebRTC.platformIsDesktop) {
@@ -36,6 +37,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    RequestPermissionUtils.requestPermission(
+        Permission.storage);
     return MaterialApp(
       title: 'Cheap Share',
       debugShowCheckedModeBanner: false,

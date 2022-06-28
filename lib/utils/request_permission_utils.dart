@@ -1,14 +1,14 @@
 import 'package:permission_handler/permission_handler.dart';
 
 class RequestPermissionUtils {
-  static Future<bool> requestPermission(Permission permission) async {
+  static Future<void> requestPermission(Permission permission) async {
     if (await permission.isGranted) {
-      return true;
+      print('true, permission granted');
     }
     final result = await permission.request();
     if (result == PermissionStatus.granted) {
-      return true;
+      print('true, permission granted');
     }
-    return false;
+    print('false, permission not granted');
   }
 }
